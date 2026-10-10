@@ -1,2 +1,3 @@
 文件大小限制：将data3.1/data3.2解压的文件放入data3：.venv\Lib\site-packages
 整合所有data数据到一个文件夹中
+其他数据为重复数据可以不用管
