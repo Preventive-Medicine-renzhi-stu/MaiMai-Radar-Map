@@ -1,0 +1,9 @@
+# 麦麦雷达地图 依赖
+# 运行时
+mcp>=2.3.0
+python-dotenv>=1.0.1
+
+# 说明：
+#   - 前端（web/）为纯静态 HTML/CSS/JS，无需构建、无运行时依赖
+#   - 地图使用腾讯地图 GL JS（官方 CDN 加载，代理模式，前端不含密钥）
+#   - 测试：Python 侧用标准库 unittest；前端 DOM 冒烟测试需额外 npm install jsdom

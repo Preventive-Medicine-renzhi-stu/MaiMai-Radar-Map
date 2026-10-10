@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>麦麦雷达地图 · 门店 · 活动 · 一键点餐</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'&gt;&lt;rect width='32' height='32' rx='7' fill='%23da291c'/&gt;&lt;text x='16' y='23' font-size='19' text-anchor='middle'&gt;🍔&lt;/text&gt;&lt;/svg&gt;">
+<!-- 本地地图 Key（可选，已被 .gitignore 排除）：由 `python -m src.main web` 依据 .env 的 TMAP_KEY 生成 -->
+<script src="tmap-key.local.js"></script>
+<script type="text/javascript">
+  // 腾讯地图 SDK 加载策略：二选一，失败再降级。
+  //   ① key   读取 tmap-key.local.js 的 __TMAP_KEY__ → 腾讯标准模式，可脱离 WorkBuddy 独立部署
+  //   ② proxy 未配置 Key → 复用 WorkBuddy 预览代理（前端零密钥，仅预览面板内可用）
+  //   ③ 都失败 → app.js 自动降级为纯 SVG 距离雷达图
+  (function () {
+    var key = (window.__TMAP_KEY__ || '').trim();
+    window.__TMAP_MODE__ = key ? 'key' : 'proxy';
+    if (!key) {
+      window._TMapSecurityConfig = {
+        serviceHost: 'http://127.0.0.1:__WB_HTTP_PORT__/_TMapService/_wbt/__WB_TMAP_SECRET__',
+      };
+    }
+    window.__TMAP_PENDING__ = true;
+    window.__TMAP_READY__ = false;
+    var s = document.createElement('script');
+    s.src = 'https://map.qq.com/api/gljs?v=1.exp&libraries=service' +
+            (key ? '&key=' + encodeURIComponent(key) : '');
+    s.onload = function () { window.__TMAP_PENDING__ = false; window.__TMAP_READY__ = true; };
+    s.onerror = function () { window.__TMAP_PENDING__ = false; window.__TMAP_READY__ = 'error'; };
+    document.head.appendChild(s);
+  })();
+</script><script src="https://map.qq.com/api/gljs?v=1.exp&amp;libraries=service&amp;key=63PBZ-KHHKI-XO5GZ-UOHV6-MGBCQ-B2FVB"></script>
+<script src="data.js"></script>
+<style type="text/css">.tmap-zoom-control {
+  margin: 10px 30px 20px 30px;
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-direction: column;
+      flex-direction: column;
+  -ms-flex-pack: center;
+      justify-content: center;
+  -ms-flex-align: center;
+      align-items: center;
+  position: relative;
+  width: 40px;
+  height: 80px;
+  background: #fff;
+  box-shadow: 0px 8px 19px rgba(41, 64, 102, 0.12);
+  border-radius: 4px;
+}
+.tmap-zoom-control .tmap-zoom-content {
+  -ms-flex: auto;
+      flex: auto;
+  -ms-flex-order: 1;
+      order: 1;
+  -ms-flex-positive: 0;
+      flex-grow: 0;
+  margin: 8px 0px;
+}
+.tmap-zoom-control .tmap-zoom-in {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  left: 8px;
+  top: 8px;
+}
+.tmap-zoom-control .tmap-zoom-out {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  left: 8px;
+  top: 48px;
+}
+.tmap-zoom-control .tmap-zoom-out-image {
+  /* 禁止选中 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+
+}
+.tmap-zoom-control .tmap-zoom-in-image {
+  /* 禁止选中 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+.tmap-zoom-control .tmap-zoom-spliter {
+  height: 1px;
+  width: 40px;
+  background-color: #dee2e8;
+  margin: auto;
+    /* 禁止选中 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+.tmap-zoom-control .tmap-zoom-number {
+  display: inline;
+  height: 22px;
+  top: 40px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  font-style: medium;
+  font-family: 'Microsoft YaHei', 'PingFang SC';
+  color: #000;
+  line-height: 22px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+</style><style type="text/css">.rotate-circle {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  padding: 20px 20px 7px 20px;
+  box-sizing: content-box;
+  -moz-user-select: none;
+  /*火狐*/
+   -webkit-user-select: none;
+  /*webkit浏览器*/
+   -ms-user-select: none;
+      user-select: none;
+}
+.rotate-circle * {
+  box-sizing: content-box;
+}
+.rotate-circle .rotate-panel {
+  position: relative;
+  left: 0;
+  top: -60px;
+  font-size: 16px;
+  line-height: normal;
+  font-family: auto;
+}
+.rotate-circle .rotate-left {
+  position: absolute;
+  top: 15px;
+  left: -6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 30px 0 0 0;
+  background: #fff;
+  transform: rotate(-45deg);
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-align: center;
+      align-items: center;
+  -ms-flex-pack: center;
+      justify-content: center;
+}
+.rotate-circle .rotate-top {
+  position: absolute;
+  left: 15px;
+  top: -6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 30px 0 0 0;
+  background: #fff;
+  transform: rotate(45deg);
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-align: center;
+      align-items: center;
+  -ms-flex-pack: center;
+      justify-content: center;
+}
+.rotate-circle .rotate-right {
+  position: absolute;
+  left: 36px;
+  top: 15px;
+  width: 30px;
+  height: 30px;
+  border-radius: 0 30px 0 0;
+  background: #fff;
+  transform: rotate(45deg);
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-align: center;
+      align-items: center;
+  -ms-flex-pack: center;
+      justify-content: center;
+}
+.rotate-circle .rotate-bottom {
+  position: absolute;
+  left: 15px;
+  top: 36px;
+  width: 30px;
+  height: 30px;
+  border-radius: 0 0 30px 0;
+  background: #fff;
+  transform: rotate(45deg);
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-align: center;
+      align-items: center;
+  -ms-flex-pack: center;
+      justify-content: center;
+}
+.rotate-circle .compass-circle {
+  width: 28px;
+  height: 28px;
+  background: #fff;
+  border: 1px solid rgba(0, 20, 51, 0.10);
+  border-radius: 50%;
+  position: relative;
+  left: 15px;
+  top: -15px;
+  z-index: 100;
+}
+.rotate-circle .compass-img {
+  height: 28px;
+  left: 30%;
+  position: relative;
+  -moz-user-select: none;
+ /*火狐*/
+  -webkit-user-select: none;
+ /*webkit浏览器*/
+  -ms-user-select: none;
+      user-select: none;
+}
+.rotate-circle .compass-circle-background {
+  width: 28px;
+  height: 28px;
+  background: #e7eaef;
+  border: 1px solid rgba(0, 20, 51, 0.10);
+  border-radius: 50%;
+  position: relative;
+  left: 15px;
+  top: 15px;
+  z-index: 50;
+}
+.rotate-circle .rotate-left-img {
+  width: 6px;
+  height: 17px;
+  position: relative;
+  transform: scaleY(-1) rotateZ(-45deg);
+  -moz-user-select: none;
+ /*火狐*/
+  -webkit-user-select: none;
+ /*webkit浏览器*/
+  -ms-user-select: none;
+      user-select: none;
+  vertical-align: baseline;
+}
+.rotate-circle .rotate-right-img {
+  width: 6px;
+  height: 17px;
+  position: relative;
+  transform: rotate(135deg);
+  -moz-user-select: none;
+ /*火狐*/
+  -webkit-user-select: none;
+ /*webkit浏览器*/
+  -ms-user-select: none;
+      user-select: none;
+  vertical-align: baseline;
+}
+.rotate-circle .rotate-top-img {
+  width: 8px;
+  height: 4px;
+  position: relative;
+  transform: rotate(-45deg);
+  -moz-user-select: none;
+ /*火狐*/
+  -webkit-user-select: none;
+ /*webkit浏览器*/
+  -ms-user-select: none;
+      user-select: none;
+  vertical-align: baseline;
+}
+.rotate-circle .rotate-bottom-img {
+  width: 8px;
+  height: 4px;
+  position: relative;
+  transform: rotate(135deg);
+  -moz-user-select: none;
+ /*火狐*/
+  -webkit-user-select: none;
+ /*webkit浏览器*/
+  -ms-user-select: none;
+      user-select: none;
+  vertical-align: baseline;
+}
+.rotate-circle .unclickable-rotate-bottom .rotate-bottom-img {
+  opacity: 0.3;
+}
+.rotate-circle .unclickable-rotate-top .rotate-top-img {
+  opacity: 0.3;
+}
+.rotate-circle .unclickable-rotate-left .rotate-left-img {
+  opacity: 0.3;
+}
+.rotate-circle .unclickable-rotate-right .rotate-right-img {
+  opacity: 0.3;
+}
+.rotate-circle .clickable-rotate-left:hover {
+  background: #f2f4f8;
+}
+.rotate-circle .clickable-rotate-right:hover {
+  background: #f2f4f8;
+}
+.rotate-circle .clickable-rotate-bottom:hover {
+  background: #f2f4f8;
+}
+.rotate-circle .clickable-rotate-top:hover {
+  background: #f2f4f8;
+}
+.rotate-circle .clickable-rotate-left:active {
+  background: #e7eaef;
+}
+.rotate-circle .clickable-rotate-right:active {
+  background: #e7eaef;
+}
+.rotate-circle .clickable-rotate-top:active {
+  background: #e7eaef;
+}
+.rotate-circle .clickable-rotate-bottom:active {
+  background: #e7eaef;
+}
+</style><style type="text/css">.floor-control {
+  font-size: 15px;
+  color: #646464;
+  height: 180px;
+  width: 38px;
+  background: rgba(255, 255, 255, 1);
+  position: relative;
+  bottom: 83px !important;
+  margin-left: 31px;
+  margin-right: 30px;
+  border-radius: 40px;
+  webkit-user-select: none;
+  ms-user-select: none;
+  moz-user-select: none;
+  apple-user-select: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
+  z-index: 10;
+}
+.floor-control:after {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  transform: scale(0.5);
+  transform-origin: left top;
+  border-radius: 40px;
+  z-index: 1000000;
+  box-shadow: 0px 0px 1px 1px rgba(0, 0, 0, 0.12);
+}
+.floor-control ul {
+  padding-inline-start: 0;
+  padding-inline-end: 0;
+  margin-block-start: 0;
+  margin-block-end: 0;
+}
+.floor-control .arr-top {
+  width: 38px;
+  position: absolute;
+  z-index: 100;
+  top: -2px;
+}
+.floor-control .arr-bottom {
+  width: 38px;
+  position: absolute;
+  z-index: 100;
+  bottom: -2px;
+}
+.floor-control .floor-control-wrapper {
+  overflow: hidden;
+  height: 160px;
+  width: 100%;
+  position: absolute;
+  top: 10px;
+}
+.floor-control .floor-control-wrapper .floor-control-list {
+  font-size: 12px;
+  list-style-type: none;
+  margin: 0;
+}
+.floor-control .floor-control-wrapper .floor-control-list .floor-control-item {
+  position: relative;
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  width: 38px;
+  height: 40px;
+  line-height: 40px;
+  transition: color 0.3s ease-in;
+}
+.floor-control .floor-control-wrapper .floor-control-list .floor-control-item:after {
+  content: '';
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 30px;
+  z-index: -10;
+  pointer-events: none;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+  background-color: #4875fd;
+}
+.floor-control .floor-control-wrapper .floor-control-list .selected-item {
+  color: #fff !important;
+  opacity: 1 !important;
+}
+.floor-control .floor-control-wrapper .floor-control-list .selected-item:after {
+  opacity: 1;
+}
+.floor-control .floor-control-wrapper.freezing .floor-control-list .floor-control-item {
+  color: #4d4d4d;
+  opacity: 0.4;
+}
+/* floor-control */
+.floor-control-moveup {
+  bottom: 83px !important;
+}
+</style><style type="text/css">/* required styles */
+
+.tmap2d-adapter-pane, .tmap2d-adapter-tile, .tmap2d-adapter-marker-icon, .tmap2d-adapter-marker-shadow, .tmap2d-adapter-tile-container, .tmap2d-adapter-pane > svg, .tmap2d-adapter-pane > canvas, .tmap2d-adapter-zoom-box, .tmap2d-adapter-image-layer, .tmap2d-adapter-layer {
+	position: absolute;
+	left: 0;
+	top: 0;
+	}
+
+.tmap2d-adapter-container {
+	overflow: hidden;
+	}
+
+.tmap2d-adapter-tile, .tmap2d-adapter-marker-icon, .tmap2d-adapter-marker-shadow {
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	    -ms-user-select: none;
+	        user-select: none;
+	-webkit-user-drag: none;
+	}
+
+/* Safari renders non-retina tile on retina better with this, but Chrome is worse */
+
+.tmap2d-adapter-safari .tmap2d-adapter-tile {
+	image-rendering: -webkit-optimize-contrast;
+	}
+
+/* hack that prevents hw layers "stretching" when loading new tiles */
+
+.tmap2d-adapter-safari .tmap2d-adapter-tile-container {
+	width: 1600px;
+	height: 1600px;
+	-webkit-transform-origin: 0 0;
+	}
+
+.tmap2d-adapter-marker-icon, .tmap2d-adapter-marker-shadow {
+	display: block;
+	}
+
+/* .tmap2d-adapter-container svg: reset svg max-width decleration shipped in Joomla! (joomla.org) 3.x */
+
+/* .tmap2d-adapter-container img: map is broken in FF if you have max-width: 100% on tiles */
+
+.tmap2d-adapter-container .tmap2d-adapter-overlay-pane svg {
+	max-width: none !important;
+	max-height: none !important;
+	}
+
+.tmap2d-adapter-container .tmap2d-adapter-marker-pane img, .tmap2d-adapter-container .tmap2d-adapter-shadow-pane img, .tmap2d-adapter-container .tmap2d-adapter-tile-pane img, .tmap2d-adapter-container img.tmap2d-adapter-image-layer, .tmap2d-adapter-container .tmap2d-adapter-tile {
+	max-width: none !important;
+	max-height: none !important;
+	width: auto;
+	padding: 0;
+	}
+
+.tmap2d-adapter-container img.tmap2d-adapter-tile {
+	/* See: https://bugs.chromium.org/p/chromium/issues/detail?id=600120 */
+	mix-blend-mode: plus-lighter;
+	}
+
+.tmap2d-adapter-container.tmap2d-adapter-touch-zoom {
+	-ms-touch-action: pan-x pan-y;
+	    touch-action: pan-x pan-y;
+	}
+
+.tmap2d-adapter-container.tmap2d-adapter-touch-drag {
+	/* Fallback for FF which doesn't support pinch-zoom */
+	-ms-touch-action: none;
+	    touch-action: none;
+	-ms-touch-action: pinch-zoom;
+	    touch-action: pinch-zoom;
+}
+
+.tmap2d-adapter-container.tmap2d-adapter-touch-drag.tmap2d-adapter-touch-zoom {
+	-ms-touch-action: none;
+	    touch-action: none;
+}
+
+.tmap2d-adapter-container {
+	-webkit-tap-highlight-color: transparent;
+}
+
+.tmap2d-adapter-container a {
+	-webkit-tap-highlight-color: rgba(51, 181, 229, 0.4);
+}
+
+.tmap2d-adapter-tile {
+	visibility: hidden;
+	}
+
+.tmap2d-adapter-tile-loaded {
+	visibility: inherit;
+	}
+
+.tmap2d-adapter-zoom-box {
+	width: 0;
+	height: 0;
+	box-sizing: border-box;
+	z-index: 800;
+	}
+
+.tmap2d-adapter-pane         { z-index: 400; }
+
+.tmap2d-adapter-tile-pane    { z-index: 200; }
+
+.tmap2d-adapter-overlay-pane { z-index: 400; }
+
+.tmap2d-adapter-shadow-pane  { z-index: 500; }
+
+.tmap2d-adapter-marker-pane  { z-index: 600; }
+
+.tmap2d-adapter-tooltip-pane   { z-index: 650; }
+
+.tmap2d-adapter-popup-pane   { z-index: 700; }
+
+.tmap2d-adapter-map-pane canvas { z-index: 100; }
+
+.tmap2d-adapter-map-pane svg    { z-index: 200; }
+
+/* control positioning */
+
+.tmap2d-adapter-control {
+	position: relative;
+	z-index: 800;
+	pointer-events: auto;
+	}
+
+.tmap2d-adapter-top, .tmap2d-adapter-bottom {
+	position: absolute;
+	z-index: 1000;
+	pointer-events: none;
+	}
+
+.tmap2d-adapter-top {
+	top: 0;
+	}
+
+.tmap2d-adapter-right {
+	right: 0;
+	}
+
+.tmap2d-adapter-bottom {
+	bottom: 0;
+	}
+
+.tmap2d-adapter-left {
+	left: 0;
+	}
+
+.tmap2d-adapter-control {
+	float: left;
+	clear: both;
+	}
+
+.tmap2d-adapter-right .tmap2d-adapter-control {
+	float: right;
+	}
+
+.tmap2d-adapter-top .tmap2d-adapter-control {
+	margin-top: 10px;
+	}
+
+.tmap2d-adapter-bottom .tmap2d-adapter-control {
+	margin-bottom: 10px;
+	}
+
+.tmap2d-adapter-left .tmap2d-adapter-control {
+	margin-left: 10px;
+	}
+
+.tmap2d-adapter-right .tmap2d-adapter-control {
+	margin-right: 10px;
+	}
+
+/* zoom and fade animations */
+
+.tmap2d-adapter-fade-anim .tmap2d-adapter-popup {
+	opacity: 0;
+	transition: opacity 0.2s linear;
+	}
+
+.tmap2d-adapter-fade-anim .tmap2d-adapter-map-pane .tmap2d-adapter-popup {
+	opacity: 1;
+	}
+
+.tmap2d-adapter-zoom-animated {
+	transform-origin: 0 0;
+	}
+
+svg.tmap2d-adapter-zoom-animated {
+	will-change: transform;
+}
+
+.tmap2d-adapter-zoom-anim .tmap2d-adapter-zoom-animated {
+	transition: transform 0.25s cubic-bezier(0,0,0.25,1);
+	}
+
+.tmap2d-adapter-zoom-anim .tmap2d-adapter-tile, .tmap2d-adapter-pan-anim .tmap2d-adapter-tile {
+	transition: none;
+	}
+
+.tmap2d-adapter-zoom-anim .tmap2d-adapter-zoom-hide {
+	visibility: hidden;
+	}
+
+/* cursors */
+
+/*
+.tmap2d-adapter-interactive {
+	cursor: pointer;
+	}
+.tmap2d-adapter-grab {
+	cursor: grab;
+	}
+.tmap2d-adapter-crosshair,
+.tmap2d-adapter-crosshair .tmap2d-adapter-interactive {
+	cursor: crosshair;
+	}
+.tmap2d-adapter-popup-pane,
+.tmap2d-adapter-control {
+	cursor: auto;
+	}
+.tmap2d-adapter-dragging .tmap2d-adapter-grab,
+.tmap2d-adapter-dragging .tmap2d-adapter-grab .tmap2d-adapter-interactive,
+.tmap2d-adapter-dragging .tmap2d-adapter-marker-draggable {
+	cursor: grabbing;
+	}
+*/
+
+/* marker & overlays interactivity */
+
+.tmap2d-adapter-marker-icon, .tmap2d-adapter-marker-shadow, .tmap2d-adapter-image-layer, .tmap2d-adapter-pane > svg path, .tmap2d-adapter-tile-container {
+	pointer-events: none;
+	}
+
+.tmap2d-adapter-marker-icon.tmap2d-adapter-interactive, .tmap2d-adapter-image-layer.tmap2d-adapter-interactive, .tmap2d-adapter-pane > svg path.tmap2d-adapter-interactive, svg.tmap2d-adapter-image-layer.tmap2d-adapter-interactive path {
+	pointer-events: auto;
+	}
+
+/* visual tweaks */
+
+.tmap2d-adapter-container {
+	background: #ddd;
+	outline-offset: 1px;
+	}
+
+.tmap2d-adapter-container a {
+	color: #0078A8;
+	}
+
+.tmap2d-adapter-zoom-box {
+	border: 2px dotted #38f;
+	background: rgba(255,255,255,0.5);
+	}
+
+/* general typography */
+
+.tmap2d-adapter-container {
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	}
+
+/* general toolbar styles */
+
+.tmap2d-adapter-bar {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+	border-radius: 4px;
+	}
+
+.tmap2d-adapter-bar a {
+	background-color: #fff;
+	border-bottom: 1px solid #ccc;
+	width: 26px;
+	height: 26px;
+	line-height: 26px;
+	display: block;
+	text-align: center;
+	text-decoration: none;
+	color: black;
+	}
+
+.tmap2d-adapter-bar a, .tmap2d-adapter-control-layers-toggle {
+	background-position: 50% 50%;
+	background-repeat: no-repeat;
+	display: block;
+	}
+
+.tmap2d-adapter-bar a:hover, .tmap2d-adapter-bar a:focus {
+	background-color: #f4f4f4;
+	}
+
+.tmap2d-adapter-bar a:first-child {
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	}
+
+.tmap2d-adapter-bar a:last-child {
+	border-bottom-left-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom: none;
+	}
+
+.tmap2d-adapter-bar a.tmap2d-adapter-disabled {
+	cursor: default;
+	background-color: #f4f4f4;
+	color: #bbb;
+	}
+
+.tmap2d-adapter-touch .tmap2d-adapter-bar a {
+	width: 30px;
+	height: 30px;
+	line-height: 30px;
+	}
+
+.tmap2d-adapter-touch .tmap2d-adapter-bar a:first-child {
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	}
+
+.tmap2d-adapter-touch .tmap2d-adapter-bar a:last-child {
+	border-bottom-left-radius: 2px;
+	border-bottom-right-radius: 2px;
+	}
+
+/* zoom control */
+
+.tmap2d-adapter-control-zoom-in, .tmap2d-adapter-control-zoom-out {
+	font: bold 18px 'Lucida Console', Monaco, monospace;
+	text-indent: 1px;
+	}
+
+.tmap2d-adapter-touch .tmap2d-adapter-control-zoom-in, .tmap2d-adapter-touch .tmap2d-adapter-control-zoom-out  {
+	font-size: 22px;
+	}
+
+/* layers control */
+
+.tmap2d-adapter-control-layers {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+	background: #fff;
+	border-radius: 5px;
+	}
+
+.tmap2d-adapter-control-layers-toggle {
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAQAAAADQ4RFAAACf0lEQVR4AY1UM3gkARTePdvdoTxXKc+qTl3aU5U6b2Kbkz3Gtq3Zw6ziLGNPzrYx7946Tr6/ee/XeCQ4D3ykPtL5tHno4n0d/h3+xfuWHGLX81cn7r0iTNzjr7LrlxCqPtkbTQEHeqOrTy4Yyt3VCi/IOB0v7rVC7q45Q3Gr5K6jt+3Gl5nCoDD4MtO+j96Wu8atmhGqcNGHObuf8OM/x3AMx38+4Z2sPqzCxRFK2aF2e5Jol56XTLyggAMTL56XOMoS1W4pOyjUcGGQdZxU6qRh7B9Zp+PfpOFlqt0zyDZckPi1ttmIp03jX8gyJ8a/PG2yutpS/Vol7peZIbZcKBAEEheEIAgFbDkz5H6Zrkm2hVWGiXKiF4Ycw0RWKdtC16Q7qe3X4iOMxruonzegJzWaXFrU9utOSsLUmrc0YjeWYjCW4PDMADElpJSSQ0vQvA1Tm6/JlKnqFs1EGyZiFCqnRZTEJJJiKRYzVYzJck2Rm6P4iH+cmSY0YzimYa8l0EtTODFWhcMIMVqdsI2uiTvKmTisIDHJ3od5GILVhBCarCfVRmo4uTjkhrhzkiBV7SsaqS+TzrzM1qpGGUFt28pIySQHR6h7F6KSwGWm97ay+Z+ZqMcEjEWebE7wxCSQwpkhJqoZA5ivCdZDjJepuJ9IQjGGUmuXJdBFUygxVqVsxFsLMbDe8ZbDYVCGKxs+W080max1hFCarCfV+C1KATwcnvE9gRRuMP2prdbWGowm1KB1y+zwMMENkM755cJ2yPDtqhTI6ED1M/82yIDtC/4j4BijjeObflpO9I9MwXTCsSX8jWAFeHr05WoLTJ5G8IQVS/7vwR6ohirYM7f6HzYpogfS3R2OAAAAAElFTkSuQmCC);
+	width: 36px;
+	height: 36px;
+	}
+
+.tmap2d-adapter-retina .tmap2d-adapter-control-layers-toggle {
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADQAAAA0CAQAAABvcdNgAAAEsklEQVR4AWL4TydIhpZK1kpWOlg0w3ZXP6D2soBtG42jeI6ZmQTHzAxiTbSJsYLjO9HhP+WOmcuhciVnmHVQcJnp7DFvScowZorad/+V/fVzMdMT2g9Cv9guXGv/7pYOrXh2U+RRR3dSd9JRx6bIFc/ekqHI29JC6pJ5ZEh1yWkhkbcFeSjxgx3L2m1cb1C7bceyxA+CNjT/Ifff+/kDk2u/w/33/IeCMOSaWZ4glosqT3DNnNZQ7Cs58/3Ce5HL78iZH/vKVIaYlqzfdLu8Vi7dnvUbEza5Idt36tquZFldl6N5Z/POLof0XLK61mZCmJSWjVF9tEjUluu74IUXvgttuVIHE7YxSkaYhJZam7yiM9Pv82JYfl9nptxZaxMJE4YSPty+vF0+Y2up9d3wwijfjZbabqm/3bZ9ecKHsiGmRflnn1MW4pjHf9oLufyn2z3y1D6n8g8TZhxyzipLNPnAUpsOiuWimg52psrTZYnOWYNDTMuWBWa0tJb4rgq1UvmutpaYEbZlwU3CLJm/ayYjHW5/h7xWLn9Hh1vepDkyf7dE7MtT5LR4e7yYpHrkhOUpEfssBLq2pPhAqoSWKUkk7EDqkmK6RrCEzqDjhNDWNE+XSMvkJRDWlZTmCW0l0PHQGRZY5t1L83kT0Y3l2SItk5JAWHl2dCOBm+fPu3fo5/3v61RMCO9Jx2EEYYhb0rmNQMX/vm7gqOEJLcXTGw3CAuRNeyaPWwjR8PRqKQ1PDA/dpv+on9Shox52WFnx0KY8onHayrJzm87i5h9xGw/tfkev0jGsQizqezUKjk12hBMKJ4kbCqGPVNXudyyrShovGw5CgxsRICxF6aRmSjlBnHRzg7Gx8fKqEubI2rahQYdR1YgDIRQO7JvQyD52hoIQx0mxa0ODtW2Iozn1le2iIRdzwWewedyZzewidueOGqlsn1MvcnQpuVwLGG3/IR1hIKxCjelIDZ8ldqWz25jWAsnldEnK0Zxro19TGVb2ffIZEsIO89EIEDvKMPrzmBOQcKQ+rroye6NgRRxqR4U8EAkz0CL6uSGOm6KQCdWjvjRiSP1BPalCRS5iQYiEIvxuBMJEWgzSoHADcVMuN7IuqqTeyUPq22qFimFtxDyBBJEwNyt6TM88blFHao/6tWWhuuOM4SAK4EI4QmFHA+SEyWlp4EQoJ13cYGzMu7yszEIBOm2rVmHUNqwAIQabISNMRstmdhNWcFLsSm+0tjJH1MdRxO5Nx0WDMhCtgD6OKgZeljJqJKc9po8juskR9XN0Y1lZ3mWjLR9JCO1jRDMd0fpYC2VnvjBSEFg7wBENc0R9HFlb0xvF1+TBEpF68d+DHR6IOWVv2BECtxo46hOFUBd/APU57WIoEwJhIi2CdpyZX0m93BZicktMj1AS9dClteUFAUNUIEygRZCtik5zSxI9MubTBH1GOiHsiLJ3OCoSZkILa9PxiN0EbvhsAo8tdAf9Seepd36lGWHmtNANTv5Jd0z4QYyeo/UEJqxKRpg5LZx6btLPsOaEmdMyxYdlc8LMaJnikDlhclqmPiQnTEpLUIZEwkRagjYkEibQErwhkTAKCLQEbUgkzJQWc/0PstHHcfEdQ+UAAAAASUVORK5CYII=);
+	background-size: 26px 26px;
+	}
+
+.tmap2d-adapter-touch .tmap2d-adapter-control-layers-toggle {
+	width: 44px;
+	height: 44px;
+	}
+
+.tmap2d-adapter-control-layers .tmap2d-adapter-control-layers-list, .tmap2d-adapter-control-layers-expanded .tmap2d-adapter-control-layers-toggle {
+	display: none;
+	}
+
+.tmap2d-adapter-control-layers-expanded .tmap2d-adapter-control-layers-list {
+	display: block;
+	position: relative;
+	}
+
+.tmap2d-adapter-control-layers-list {
+	border: 0;
+	margin: 0;
+	padding: 0;
+	}
+
+.tmap2d-adapter-control-layers-expanded {
+	padding: 6px 10px 6px 6px;
+	color: #333;
+	background: #fff;
+	}
+
+.tmap2d-adapter-control-layers-scrollbar {
+	overflow-y: scroll;
+	overflow-x: hidden;
+	padding-right: 5px;
+	}
+
+.tmap2d-adapter-control-layers-selector {
+	margin-top: 2px;
+	position: relative;
+	top: 1px;
+	}
+
+.tmap2d-adapter-control-layers label {
+	display: block;
+	font-size: 13px;
+	font-size: 1.08333em;
+	}
+
+.tmap2d-adapter-control-layers-separator {
+	height: 0;
+	border-top: 1px solid #ddd;
+	margin: 5px -10px 5px -6px;
+	}
+
+/* Default icon URLs */
+
+.tmap2d-adapter-default-icon-path { /* used only in path-guessing heuristic, see L.Icon.Default */
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAApCAYAAADAk4LOAAAFgUlEQVR4Aa1XA5BjWRTN2oW17d3YaZtr2962HUzbDNpjszW24mRt28p47v7zq/bXZtrp/lWnXr337j3nPCe85NcypgSFdugCpW5YoDAMRaIMqRi6aKq5E3YqDQO3qAwjVWrD8Ncq/RBpykd8oZUb/kaJutow8r1aP9II0WmLKLIsJyv1w/kqw9Ch2MYdB++12Onxee/QMwvf4/Dk/Lfp/i4nxTXtOoQ4pW5Aj7wpici1A9erdAN2OH64x8OSP9j3Ft3b7aWkTg/Fm91siTra0f9on5sQr9INejH6CUUUpavjFNq1B+Oadhxmnfa8RfEmN8VNAsQhPqF55xHkMzz3jSmChWU6f7/XZKNH+9+hBLOHYozuKQPxyMPUKkrX/K0uWnfFaJGS1QPRtZsOPtr3NsW0uyh6NNCOkU3Yz+bXbT3I8G3xE5EXLXtCXbbqwCO9zPQYPRTZ5vIDXD7U+w7rFDEoUUf7ibHIR4y6bLVPXrz8JVZEql13trxwue/uDivd3fkWRbS6/IA2bID4uk0UpF1N8qLlbBlXs4Ee7HLTfV1j54APvODnSfOWBqtKVvjgLKzF5YdEk5ewRkGlK0i33Eofffc7HT56jD7/6U+qH3Cx7SBLNntH5YIPvODnyfIXZYRVDPqgHtLs5ABHD3YzLuespb7t79FY34DjMwrVrcTuwlT55YMPvOBnRrJ4VXTdNnYug5ucHLBjEpt30701A3Ts+HEa73u6dT3FNWwflY86eMHPk+Yu+i6pzUpRrW7SNDg5JHR4KapmM5Wv2E8Tfcb1HoqqHMHU+uWDD7zg54mz5/2BSnizi9T1Dg4QQXLToGNCkb6tb1NU+QAlGr1++eADrzhn/u8Q2YZhQVlZ5+CAOtqfbhmaUCS1ezNFVm2imDbPmPng5wmz+gwh+oHDce0eUtQ6OGDIyR0uUhUsoO3vfDmmgOezH0mZN59x7MBi++WDL1g/eEiU3avlidO671bkLfwbw5XV2P8Pzo0ydy4t2/0eu33xYSOMOD8hTf4CrBtGMSoXfPLchX+J0ruSePw3LZeK0juPJbYzrhkH0io7B3k164hiGvawhOKMLkrQLyVpZg8rHFW7E2uHOL888IBPlNZ1FPzstSJM694fWr6RwpvcJK60+0HCILTBzZLFNdtAzJaohze60T8qBzyh5ZuOg5e7uwQppofEmf2++DYvmySqGBuKaicF1blQjhuHdvCIMvp8whTTfZzI7RldpwtSzL+F1+wkdZ2TBOW2gIF88PBTzD/gpeREAMEbxnJcaJHNHrpzji0gQCS6hdkEeYt9DF/2qPcEC8RM28Hwmr3sdNyht00byAut2k3gufWNtgtOEOFGUwcXWNDbdNbpgBGxEvKkOQsxivJx33iow0Vw5S6SVTrpVq11ysA2Rp7gTfPfktc6zhtXBBC+adRLshf6sG2RfHPZ5EAc4sVZ83yCN00Fk/4kggu40ZTvIEm5g24qtU4KjBrx/BTTH8ifVASAG7gKrnWxJDcU7x8X6Ecczhm3o6YicvsLXWfh3Ch1W0k8x0nXF+0fFxgt4phz8QvypiwCCFKMqXCnqXExjq10beH+UUA7+nG6mdG/Pu0f3LgFcGrl2s0kNNjpmoJ9o4B29CMO8dMT4Q5ox8uitF6fqsrJOr8qnwNbRzv6hSnG5wP+64C7h9lp30hKNtKdWjtdkbuPA19nJ7Tz3zR/ibgARbhb4AlhavcBebmTHcFl2fvYEnW0ox9xMxKBS8btJ+KiEbq9zA4RthQXDhPa0T9TEe69gWupwc6uBUphquXgf+/FrIjweHQS4/pduMe5ERUMHUd9xv8ZR98CxkS4F2n3EUrUZ10EYNw7BWm9x1GiPssi3GgiGRDKWRYZfXlON+dfNbM+GgIwYdwAAAAASUVORK5CYII=);
+	}
+
+/* attribution and scale controls */
+
+.tmap2d-adapter-container .tmap2d-adapter-control-attribution {
+	background: #fff;
+	background: rgba(255, 255, 255, 0.8);
+	margin: 0;
+	}
+
+.tmap2d-adapter-control-attribution, .tmap2d-adapter-control-scale-line {
+	padding: 0 5px;
+	color: #333;
+	line-height: 1.4;
+	}
+
+.tmap2d-adapter-control-attribution a {
+	text-decoration: none;
+	}
+
+.tmap2d-adapter-control-attribution a:hover, .tmap2d-adapter-control-attribution a:focus {
+	text-decoration: underline;
+	}
+
+.tmap2d-adapter-attribution-flag {
+	display: inline !important;
+	vertical-align: baseline !important;
+	width: 1em;
+	height: 0.6669em;
+	margin-right: 0.277em;
+	}
+
+.tmap2d-adapter-left .tmap2d-adapter-control-scale {
+	margin-left: 5px;
+	}
+
+.tmap2d-adapter-bottom .tmap2d-adapter-control-scale {
+	margin-bottom: 5px;
+	}
+
+.tmap2d-adapter-control-scale-line {
+	border: 2px solid #777;
+	border-top: none;
+	line-height: 1.1;
+	padding: 2px 5px 1px;
+	white-space: nowrap;
+	box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.8);
+	text-shadow: 1px 1px #fff;
+	}
+
+.tmap2d-adapter-control-scale-line:not(:first-child) {
+	border-top: 2px solid #777;
+	border-bottom: none;
+	margin-top: -2px;
+	}
+
+.tmap2d-adapter-control-scale-line:not(:first-child):not(:last-child) {
+	border-bottom: 2px solid #777;
+	}
+
+.tmap2d-adapter-touch .tmap2d-adapter-control-attribution, .tmap2d-adapter-touch .tmap2d-adapter-control-layers, .tmap2d-adapter-touch .tmap2d-adapter-bar {
+	box-shadow: none;
+	}
+
+.tmap2d-adapter-touch .tmap2d-adapter-control-layers, .tmap2d-adapter-touch .tmap2d-adapter-bar {
+	border: 2px solid rgba(0,0,0,0.2);
+	background-clip: padding-box;
+	}
+
+/* popup */
+
+.tmap2d-adapter-popup {
+	position: absolute;
+	text-align: center;
+	margin-bottom: 20px;
+	}
+
+.tmap2d-adapter-popup-content-wrapper {
+	padding: 1px;
+	text-align: left;
+	border-radius: 12px;
+	}
+
+.tmap2d-adapter-popup-content {
+	margin: 13px 24px 13px 20px;
+	line-height: 1.3;
+	font-size: 13px;
+	font-size: 1.08333em;
+	min-height: 1px;
+	}
+
+.tmap2d-adapter-popup-content p {
+	margin: 17px 0;
+	margin: 1.3em 0;
+	}
+
+.tmap2d-adapter-popup-tip-container {
+	width: 40px;
+	height: 20px;
+	position: absolute;
+	left: 50%;
+	margin-top: -1px;
+	margin-left: -20px;
+	overflow: hidden;
+	pointer-events: none;
+	}
+
+.tmap2d-adapter-popup-tip {
+	width: 17px;
+	height: 17px;
+	padding: 1px;
+
+	margin: -10px auto 0;
+	pointer-events: auto;
+
+	transform: rotate(45deg);
+	}
+
+.tmap2d-adapter-popup-content-wrapper, .tmap2d-adapter-popup-tip {
+	background: white;
+	color: #333;
+	box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+	}
+
+.tmap2d-adapter-container a.tmap2d-adapter-popup-close-button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	border: none;
+	text-align: center;
+	width: 24px;
+	height: 24px;
+	font: 16px/24px Tahoma, Verdana, sans-serif;
+	color: #757575;
+	text-decoration: none;
+	background: transparent;
+	}
+
+.tmap2d-adapter-container a.tmap2d-adapter-popup-close-button:hover, .tmap2d-adapter-container a.tmap2d-adapter-popup-close-button:focus {
+	color: #585858;
+	}
+
+.tmap2d-adapter-popup-scrolled {
+	overflow: auto;
+	}
+
+/* div icon */
+
+.tmap2d-adapter-div-icon {
+	background: #fff;
+	border: 1px solid #666;
+	}
+
+/* Tooltip */
+
+/* Base styles for the element that has a tooltip */
+
+.tmap2d-adapter-tooltip {
+	position: absolute;
+	padding: 6px;
+	background-color: #fff;
+	border: 1px solid #fff;
+	border-radius: 3px;
+	color: #222;
+	white-space: nowrap;
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	    -ms-user-select: none;
+	        user-select: none;
+	pointer-events: none;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	}
+
+.tmap2d-adapter-tooltip.tmap2d-adapter-interactive {
+	cursor: pointer;
+	pointer-events: auto;
+	}
+
+.tmap2d-adapter-tooltip-top:before, .tmap2d-adapter-tooltip-bottom:before, .tmap2d-adapter-tooltip-left:before, .tmap2d-adapter-tooltip-right:before {
+	position: absolute;
+	pointer-events: none;
+	border: 6px solid transparent;
+	background: transparent;
+	content: "";
+	}
+
+/* Directions */
+
+.tmap2d-adapter-tooltip-bottom {
+	margin-top: 6px;
+}
+
+.tmap2d-adapter-tooltip-top {
+	margin-top: -6px;
+}
+
+.tmap2d-adapter-tooltip-bottom:before, .tmap2d-adapter-tooltip-top:before {
+	left: 50%;
+	margin-left: -6px;
+	}
+
+.tmap2d-adapter-tooltip-top:before {
+	bottom: 0;
+	margin-bottom: -12px;
+	border-top-color: #fff;
+	}
+
+.tmap2d-adapter-tooltip-bottom:before {
+	top: 0;
+	margin-top: -12px;
+	margin-left: -6px;
+	border-bottom-color: #fff;
+	}
+
+.tmap2d-adapter-tooltip-left {
+	margin-left: -6px;
+}
+
+.tmap2d-adapter-tooltip-right {
+	margin-left: 6px;
+}
+
+.tmap2d-adapter-tooltip-left:before, .tmap2d-adapter-tooltip-right:before {
+	top: 50%;
+	margin-top: -6px;
+	}
+
+.tmap2d-adapter-tooltip-left:before {
+	right: 0;
+	margin-right: -12px;
+	border-left-color: #fff;
+	}
+
+.tmap2d-adapter-tooltip-right:before {
+	left: 0;
+	margin-left: -12px;
+	border-right-color: #fff;
+	}
+
+/* Printing */
+
+@media print {
+	/* Prevent printers from removing background-images of controls. */
+	.tmap2d-adapter-control {
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+}
+</style></head>
+<body data-page="radar" class="has-login">
+
+<!-- ====================== 全局顶栏 ====================== -->
+<header class="appbar">
+  <a class="brand" href="#/" data-nav="/">
+    <span class="brand-mark">🍟</span>
+    <span class="brand-text">
+      <strong>麦麦雷达地图</strong>
+      <span class="brand-sub">门店 · 活动 · 一键点餐</span>
+    </span>
+  </a>
+
+  <nav class="appnav">
+    <a href="#/" data-nav="/" data-route="/" class="is-active">雷达地图</a>
+    <a href="#/order" data-nav="/order" data-route="/order">点餐</a>
+    <a href="#/checkout" data-nav="/checkout" data-route="/checkout">确认订单</a>
+  </nav>
+
+  <div class="account" id="account-box"><span class="pill-demo">MCP 实时</span><div class="user-menu" id="user-menu"><button class="user-trigger" id="user-trigger" aria-haspopup="true" aria-expanded="false"><span class="user-avatar is-off" id="user-avatar">?</span><span class="user-brief"><b id="user-name">未登录</b><span id="user-sub">100.9 麦享会积分可用</span></span><span class="user-caret" aria-hidden="true">▾</span></button><div class="user-drop" id="user-drop" role="menu"><div class="ud-section"><div class="ud-title">账号<em>本地演示登录</em></div><div class="ud-account"><span class="uda-avatar is-off">?</span><div class="uda-body"><b>未登录</b><span>登录后这里显示你的身份（本地演示）</span></div><button class="btn btn-primary btn-sm" data-login-open="">立即登录</button></div><p class="ud-gap is-tight">登录状态只存在这个浏览器里，不上传任何信息，也未接入麦当劳真实账号体系；下面的券 / 积分 / 订单来自 MCP 真实返回的账户数据。</p></div><div class="ud-head"><span class="ud-avatar">麦</span><div class="ud-who"><b>麦享会会员</b><span>账户 02001…6702</span></div></div><div class="ud-section"><div class="ud-title">积分账户<em>query-my-account</em></div><div class="ud-grid"><div class="ud-cell is-hl"><b>100.9</b><span>可用积分</span></div><div class="ud-cell"><b>370</b><span>累计获得</span></div><div class="ud-cell"><b>269.1</b><span>已过期</span></div></div><p class="ud-note">本月将过期 0 · 下月将过期 0 · 已使用 0 · 冻结 0</p></div><div class="ud-section"><div class="ud-title">我的优惠券<em>available-coupons</em><span class="ud-count">4 张</span></div><ul class="ud-list"><li><b>巧克力味厚松饼猪柳蛋套餐</b><span>卡包券 · 标题未写明金额</span></li><li><b>免费脆薯饼</b><span>卡包券 · 标题未写明金额</span></li><li><b>人气麦旋风买一送一</b><span>卡包券 · 标题未写明金额</span></li><li><b>9.9元中杯冰美式</b><span>卡包券 · 券面 ¥9.9</span></li></ul></div><div class="ud-section"><div class="ud-title">历史订单<em>order-list</em><span class="ud-count">1 单</span></div><ul class="ud-list"><li><b>堡堡随心拼（7件任选）</b><span>麦当劳马鞍山湖东路餐厅 · 2026-08-17 · 实付 ¥73</span></li></ul></div><div class="ud-section"><div class="ud-title">口味偏好<em>从历史订单推导</em></div><div class="chips"><span class="chip is-on">麦辣鸡腿汉堡</span><span class="chip is-on">巨无霸</span><span class="chip is-on">中薯条</span><span class="chip is-on">麦辣鸡翅2块</span><span class="chip is-on">麦乐鸡5块</span><span class="chip is-on">雪碧中杯</span></div></div><div class="ud-foot"><span>定位：上海 · 人民广场</span><span>数据时间 00:33</span></div><p class="ud-gap">⚠️ 麦当劳 MCP 的 35 个 Tool 中<strong>没有昵称、手机号、头像</strong>这类个人资料接口，因此本卡片只呈现 MCP 真实返回的账户 ID、积分、券与订单，不做虚构填充。</p></div></div></div>
+</header>
+
+<main class="app-main">
+
+  <!-- ====================== 首页：雷达地图 ====================== -->
+  <div data-page-view="radar" id="page-radar">
+
+    <div class="pagesub">
+      <form class="locator" id="locator-form">
+        <div class="city-picker" id="city-picker">
+          <button type="button" class="city-trigger" id="city-trigger" aria-haspopup="listbox" aria-expanded="false" title="当前城市：上海 —— 本地服务已连接，点开可直接切换城市">
+            <span class="city-pin" aria-hidden="true">📍</span>
+            <span class="city-text"><em>城市</em><b id="city-current">上海</b></span>
+            <span class="city-caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="city-drop" id="city-drop" role="listbox" aria-label="选择城市" hidden=""><div class="city-drop-head">点城市名即直接切换 —— 本地服务会用 .env 里的 Token 实时调用麦当劳 MCP</div><div class="city-grid"><button type="button" class="city-opt" data-city="深圳" role="option" aria-selected="false"><span class="co-name">深圳</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt is-on" data-city="上海" role="option" aria-selected="true"><span class="co-name">上海</span><span class="co-flag is-snap">当前快照</span></button><button type="button" class="city-opt" data-city="北京" role="option" aria-selected="false"><span class="co-name">北京</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt" data-city="广州" role="option" aria-selected="false"><span class="co-name">广州</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt" data-city="杭州" role="option" aria-selected="false"><span class="co-name">杭州</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt" data-city="成都" role="option" aria-selected="false"><span class="co-name">成都</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt" data-city="武汉" role="option" aria-selected="false"><span class="co-name">武汉</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt" data-city="南京" role="option" aria-selected="false"><span class="co-name">南京</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt" data-city="西安" role="option" aria-selected="false"><span class="co-name">西安</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt" data-city="重庆" role="option" aria-selected="false"><span class="co-name">重庆</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt" data-city="苏州" role="option" aria-selected="false"><span class="co-name">苏州</span><span class="co-flag is-live">点一下切换</span></button><button type="button" class="city-opt" data-city="天津" role="option" aria-selected="false"><span class="co-name">天津</span><span class="co-flag is-live">点一下切换</span></button></div><div class="city-drop-foot">首次切换通常十几秒：服务端要逐店拉菜单</div></div>
+        </div>
+        <input id="keyword-input" type="text" placeholder="输入位置，如 腾讯滨海大厦" aria-label="位置关键词">
+        <button type="submit" class="locator-go">重新定位</button>
+      </form>
+      <button class="btn btn-primary btn-quick" data-order-quick="">
+        <span>⚡</span> 一键点餐
+      </button>
+    </div>
+
+    <div class="locator-status is-ok" id="locator-status"><span>📍</span><span><b>当前数据快照：上海 · 人民广场</b> —— 门店、菜单、活动、券都来自这一次真实查询。麦当劳 MCP 覆盖全国，点城市名就能直接换。</span><span class="ls-chip is-ok">🚀 本地服务已连接 · 点城市名可直接切换</span></div>
+
+    <nav class="modes" id="mode-tabs" role="tablist">
+      <button class="mode-tab is-active" data-mode="nearby" role="tab">
+        <span class="mode-no">1.1</span>
+        <span class="mode-name">就近 / 常客</span>
+        <span class="mode-desc">距离最近，或我最常去的店</span>
+      </button>
+      <button class="mode-tab" data-mode="newest" role="tab">
+        <span class="mode-no">1.2</span>
+        <span class="mode-name">追新 / 粉丝</span>
+        <span class="mode-desc">限时新品哪家店有货、周边何时开售</span>
+      </button>
+      <button class="mode-tab" data-mode="speed" role="tab">
+        <span class="mode-no">1.3</span>
+        <span class="mode-name">极速模式</span>
+        <span class="mode-desc">先填要买的，再算哪家最快能拿到</span>
+      </button>
+    </nav>
+
+    <div class="workspace">
+      <aside class="panel panel-left">
+        <div class="panel-head">
+          <h2 id="left-title">附近门店</h2>
+          <div class="panel-head-actions" id="left-actions"><span class="seg" id="nearby-seg"><button data-sort="distance" class="is-active">距离最近</button><button data-sort="frequent" class="">最常去</button></span></div>
+        </div>
+        <div class="panel-body" id="left-body"><div class="quick-order"><span class="qo-tag">一键点餐</span><div class="qo-copy"><strong>麦当劳上海黄浦华旭国际大厦餐厅<em class="qo-src is-auto">按「距离最近」推荐</em></strong><span>144m · 步行约 2 分钟 · 空闲</span></div><button class="btn btn-primary" data-order="1450713">用这家店点餐</button></div><p class="qo-note">点左侧任意门店卡片，就能把「一键点餐」切到那家店 —— 右下角的悬浮球用的是同一家。</p><article class="store-card is-best" data-store="1450713"><div class="store-top"><span class="store-rank">1</span><span class="store-name">麦当劳上海黄浦华旭国际大厦餐厅</span><span class="store-dist">144m</span></div><div class="store-addr">南京东路街道西藏中路336号</div><div class="store-metrics"><span class="metric"><b>2 分</b><span>步行到达</span></span><span class="metric"><b>3 分</b><span>取餐等待*</span></span><span class="metric is-cool"><b>空闲</b><span>繁忙度*</span></span></div><div class="badges"><span class="badge is-info">支持预约</span><span class="badge is-ok">步行可达</span></div><div class="store-actions"><button class="btn btn-order" data-order="1450713">去点餐</button></div></article><article class="store-card" data-store="1450441"><div class="store-top"><span class="store-rank">2</span><span class="store-name">麦当劳上海福州路餐厅</span><span class="store-dist">235m</span></div><div class="store-addr">福州路666号</div><div class="store-metrics"><span class="metric"><b>3 分</b><span>步行到达</span></span><span class="metric"><b>0 分</b><span>取餐等待*</span></span><span class="metric is-cool"><b>未营业</b><span>繁忙度*</span></span></div><div class="badges"><span class="badge is-info">支持预约</span><span class="badge is-ok">步行可达</span></div><div class="store-actions"><button class="btn btn-order" data-order="1450441">去点餐</button></div></article><article class="store-card" data-store="1450056"><div class="store-top"><span class="store-rank">3</span><span class="store-name">麦当劳上海食品一店餐厅</span><span class="store-dist">355m</span></div><div class="store-addr">南京东路720号</div><div class="store-metrics"><span class="metric"><b>4 分</b><span>步行到达</span></span><span class="metric"><b>0 分</b><span>取餐等待*</span></span><span class="metric is-cool"><b>未营业</b><span>繁忙度*</span></span></div><div class="badges"><span class="badge is-info">支持预约</span><span class="badge is-ok">步行可达</span></div><div class="store-actions"><button class="btn btn-order" data-order="1450056">去点餐</button></div></article><article class="store-card" data-store="1450195"><div class="store-top"><span class="store-rank">4</span><span class="store-name">麦当劳上海雅居乐餐厅</span><span class="store-dist">382m</span></div><div class="store-addr">西藏中路525号</div><div class="store-metrics"><span class="metric"><b>5 分</b><span>步行到达</span></span><span class="metric"><b>0 分</b><span>取餐等待*</span></span><span class="metric is-cool"><b>未营业</b><span>繁忙度*</span></span></div><div class="badges"><span class="badge is-info">支持预约</span><span class="badge is-ok">步行可达</span></div><div class="store-actions"><button class="btn btn-order" data-order="1450195">去点餐</button></div></article><article class="store-card" data-store="1450124"><div class="store-top"><span class="store-rank">5</span><span class="store-name">麦当劳上海南京西路NX258餐厅</span><span class="store-dist">412m</span></div><div class="store-addr">南京西路258号1幢一层</div><div class="store-metrics"><span class="metric"><b>5 分</b><span>步行到达</span></span><span class="metric"><b>0 分</b><span>取餐等待*</span></span><span class="metric is-cool"><b>未营业</b><span>繁忙度*</span></span></div><div class="badges"><span class="badge is-info">支持预约</span><span class="badge is-ok">步行可达</span></div><div class="store-actions"><button class="btn btn-order" data-order="1450124">去点餐</button></div></article></div>
+      </aside>
+
+      <section class="map-area">
+        <div id="tmap" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); overflow: hidden; position: relative; cursor: default;"><canvas width="646" height="1249" style="width: 646px; height: 1249px; display: block; z-index: 2;"></canvas><div style="position: absolute; left: 0px; top: 0px; overflow: hidden; z-index: 1000; width: 100%; height: 100%;"><div style="left: 0px; top: 0px; z-index: 101;"></div><div style="left: 0px; top: 0px; overflow: visible; z-index: 102; pointer-events: auto;"><div style="inset: auto auto 0px 0px; position: absolute; transform: translate(0px, 0px);"><div class="" style="height: 35px; width: 101px; position: relative; left: 0px; right: auto; bottom: auto; margin-left: 0px; margin-bottom: 0px;"><div class="tmap-scale-control" style="position: relative; user-select: none; width: 101px; height: 35px;"><div style="position: absolute; width: 100%; height: 35px;"><div style="width: 100%; position: absolute; left: 0px; right: auto;"><div class="tmap-scale-line" style="position: absolute; border-width: 1px 0px 0px 1px; border-style: solid; border-color: rgb(255, 255, 255); border-image: none; width: 2px; height: 9px; background: rgb(0, 0, 0); font-size: 0px; line-height: 0; top: 7px; left: 0px; z-index: 0; box-sizing: content-box; right: auto;"></div><div class="tmap-scale-text" style="position: relative; inset: 0px auto auto 5px; font: 11px arial, simsun; color: rgb(0, 0, 0); text-align: left; -webkit-text-stroke: 1px rgb(255, 255, 255); paint-order: stroke; width: 80px; margin-left: 0px; margin-right: 0px;">100 米</div><div style="position: absolute; height: 7px; width: 100%; bottom: 0px; z-index: 1; left: 0px; right: auto;"><div class="tmap-scale-line" style="position: absolute; border-width: 1px 1px 0px; border-style: solid; border-color: rgb(255, 255, 255); border-image: none; width: 2px; height: 6px; background: rgb(0, 0, 0); font-size: 0px; line-height: 0; top: 0px; left: 56px; z-index: 2; box-sizing: content-box; right: auto;"></div><div class="tmap-scale-line" style="position: absolute; border-width: 1px 1px 1px 0px; border-style: solid; border-color: rgb(255, 255, 255); border-image: none; width: 56px; height: 2px; background: rgb(0, 0, 0); font-size: 0px; line-height: 0; z-index: 1; left: 3px; top: 6px; box-sizing: content-box; visibility: hidden; right: auto;"></div></div></div><div style="width: 100%; position: absolute; left: 0px; right: auto;"><div class="tmap-scale-line" style="position: absolute; border-width: 0px 0px 1px 1px; border-style: solid; border-color: rgb(255, 255, 255); border-image: none; width: 2px; height: 6px; background: rgb(0, 0, 0); font-size: 0px; line-height: 0; top: 17px; left: 0px; z-index: 0; box-sizing: content-box; right: auto;"></div><div class="tmap-scale-text" style="position: relative; inset: auto auto -17px 5px; font: 11px arial, simsun; color: rgb(0, 0, 0); text-align: left; -webkit-text-stroke: 1px rgb(255, 255, 255); paint-order: stroke; width: 80px; margin-left: 0px; margin-right: 0px;">500 英尺</div><div style="position: absolute; height: 7px; width: 100%; bottom: 0px; z-index: 0; left: 0px; right: auto;"><div class="tmap-scale-line" style="position: absolute; border-width: 0px 1px 1px; border-style: solid; border-color: rgb(255, 255, 255); border-image: none; width: 2px; height: 6px; background: rgb(0, 0, 0); font-size: 0px; line-height: 0; top: 9px; left: 91px; z-index: 2; box-sizing: content-box; right: auto;"></div><div class="tmap-scale-line" style="position: absolute; border-width: 1px 1px 1px 0px; border-style: solid; border-color: rgb(255, 255, 255); border-image: none; width: 91px; height: 2px; background: rgb(0, 0, 0); font-size: 0px; line-height: 0; z-index: 1; left: 3px; top: 6px; box-sizing: content-box; right: auto;"></div></div></div></div></div></div><div class="" style="margin: 1px; display: flex; align-items: center; user-select: none;"><a href="http://map.qq.com?ref=jsapi_v3" target="_blank" style="max-height: 22px; max-width: 150px; transform: rotateX(0deg);"><img src="https://mapapi.qq.com/web/jsapi/logo/logo_def.png" style="max-height: 22px; max-width: 150px;"></a><div class="logo-text" style="padding-left: 5px; font-size: 10px; color: rgb(51, 51, 51); font-family: Arial, sans-serif; white-space: nowrap; z-index: 0; transform: rotateX(0deg); display: block;">©2026 Tencent - GS(2026)1190号</div></div></div><div style="inset: 0px 0px auto auto; position: absolute; transform: translate(0px, 0px);"><div class=""><div class="rotate-circle">		<div class="compass-circle-background"></div>		<div class="compass-circle" style="transform: rotateX(0deg);">			<img class="compass-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAoCAYAAAD32nqhAAADEklEQVR4AbWWNZgkZRCG3+rZOV3D3Z3za9xJcHc6wXsXi4jIyNAYmfw5C3HIcc7dMnzd/f/Y6+efembOtdrtra++qhVOaAxedvOH/Rdc+yEHiYQDhObd0RgU2oPUvuf8iAHDU5OZiUYza+zr68+OGADWJkAIRNsRAYYW3JkKloIwQGhp71kL0sNXEMj9PCJCID8sgO54sjExMiQMQyhCyHTavMZDAsZ6+zJBI+CfAkhq7BHZYZSgXBJgmIFEEWZGUMgPChi//v5UkJpF62okFFAp7Wi5Mj2wghByJCRBhFiVYMR7rsIBbp6CMsxT4qEIEghl/7mZNYCJkTE3D2K2ahesrqONNjqa7QPAQm61rkleguGqCq6mQl4H0C2PpIhUqslW86GIUL8m7ZhzfuqAALl/6CfyBYwI985MTZEXAD35ZCNmGW68sHKZ8lvtzP3xC5p+/YZZb78J5YZojbe0MLOBTrIgNWIxuxkNbzxP+SX3iVmvvwBBDL3zEZIohgoaJ7u7s0SQu+g4Aw0P3c3eMeOpB/Ekvidv2PbJe0xJKAQEKIirW1soUx+TJ7ey+/tVSBDiuyZIlCQVdyaiu3v72Du6untRVOmjbuGzhNa5y8xsMBqPBP/818m/HV1MTExObxP8/W8Hf/7dUVsBZslg69wZyw1g09ZdnwUpV4iNCyJIQCE3HoUkQMU5ZpWbrl3YlgCUoIKo7bPLrJts7xQkCRUfpKuuunQ1xmqA+mkuQF47ojreq29IF66OAE9RqPCBQhQfSxgFyBVYzF4HKJ3SvAzToMsUHq4GEAw2zSot2wcw7/TTBw1bhvC5rw2LTDMtmzdv3mA9wK+SStVA7asgqiq7/H0AC6fNNNnqav340FQ7k0ybd9Xqg/1WLgySaooGN1JE8w4GKNG6LEkY9F9p/iveps1j2T4J2TdYu2H7Z1LIg+QKBJXrlsxrO6gCV1EuVTDz+iUolZIKRxJrNmz9/fd1W/Tb2s2aPv5+xP8fJFCxqMKwyhEDyqVTlpkxCBqcVT5lGUcTqzdu+2D1+i0fcCLjf0XElF4DYemFAAAAAElFTkSuQmCC" style="transform: rotateZ(0deg);">		</div>		<div class="rotate-panel">			<div class="rotate-left clickable-rotate-left">				<img class="rotate-left-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAiCAYAAABr0zihAAABkUlEQVR4AWKgCsgs61RPK2p9llbVLwnopBwe5AiiMB7nGtu2nXNs28kwLMQY1atYp+SWY2xbf8ga17V7G4t+vdtVsztofr+Hr5AWECDwwASMAJGX9GJ6s0+QQJkDQGYsZnRSA2ZUR+z8QwRW+4qP3b/f3Yxa4AYCVLz3BYIUNiOx+Q9SURs4c3WYT/3wyAs4ECRbiK3mzBeFrQGWxbHYry44OoP5XiFqnstNnvrlQxVgZv/qrT9fAZh/qAvw66NtsWEYHU37KputlN9CTMSCBD64+zKv4zZw4rzoj6IxkULZTVutHkxgkv0gQuVc1CCDoHI6mORG1CCHlRpAnMAZxBQ1QIDgDNfHKgGrZjcQ4ddnqDMwsRuPKizWZJAbkK1cLlUD9OoyBBC5RQlECYzzzJu4ErCnNhHFzYB4iwQ+1v5vAojI0QMU7rvLOnYO+mqshQO4D7lDCRw7fW2IPefb1AcVf1zbS2X4rOyp2yLDqCwGh/TbJBXVrvF4l45b71zACy0QIbeGmsInZnlP0Y7X3k89HCaJpH6+oPwAAAAASUVORK5CYII=">			</div>			<div class="rotate-top clickable-rotate-top">				<img class="rotate-top-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAICAYAAADwdn+XAAAASklEQVR4AWPAB9JKWqNAmIEckFHS2pBW1PofhEFssjUjG0KGZkxDyNGMaQhhzYQNwQhtkAQpGCV20ovbQtKL2r4RqxmkFqQHpBcA3gqccd9+wbMAAAAASUVORK5CYII=">			</div>			<div class="rotate-right clickable-rotate-right">				<img class="rotate-right-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAiCAYAAABr0zihAAABkUlEQVR4AWKgCsgs61RPK2p9llbVLwnopBwe5AiiMB7nGtu2nXNs28kwLMQY1atYp+SWY2xbf8ga17V7G4t+vdtVsztofr+Hr5AWECDwwASMAJGX9GJ6s0+QQJkDQGYsZnRSA2ZUR+z8QwRW+4qP3b/f3Yxa4AYCVLz3BYIUNiOx+Q9SURs4c3WYT/3wyAs4ECRbiK3mzBeFrQGWxbHYry44OoP5XiFqnstNnvrlQxVgZv/qrT9fAZh/qAvw66NtsWEYHU37KputlN9CTMSCBD64+zKv4zZw4rzoj6IxkULZTVutHkxgkv0gQuVc1CCDoHI6mORG1CCHlRpAnMAZxBQ1QIDgDNfHKgGrZjcQ4ddnqDMwsRuPKizWZJAbkK1cLlUD9OoyBBC5RQlECYzzzJu4ErCnNhHFzYB4iwQ+1v5vAojI0QMU7rvLOnYO+mqshQO4D7lDCRw7fW2IPefb1AcVf1zbS2X4rOyp2yLDqCwGh/TbJBXVrvF4l45b71zACy0QIbeGmsInZnlP0Y7X3k89HCaJpH6+oPwAAAAASUVORK5CYII=">			</div>			<div class="rotate-bottom unclickable-rotate-bottom">				<img class="rotate-bottom-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAICAYAAADwdn+XAAAASklEQVR4AWPAB9JKWqNAmIEckFHS2pBW1PofhEFssjUjG0KGZkxDyNGMaQhhzYQNwQhtkAQpGCV20ovbQtKL2r4RqxmkFqQHpBcA3gqccd9+wbMAAAAASUVORK5CYII=">			</div>		</div>	</div></div><div class=""><div class="tmap-zoom-control">    <div class="tmap-zoom-content">        <div class="tmap-zoom-in"><img class="tmap-zoom-in-image" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAABdSURBVHgB7dTBCQAhDATA9bgO7grQGuy/BGvQBqxBMS/B1woiYgbyCcIiLAHUWT4fZQgv8xgGFqQHi2nA/gAzbFoNJ9oiChJycP1q+Q84vy8yBG3RBQHcNW09V8epFRQL9pWRYd8AAAAASUVORK5CYII="></div>        <div class="tmap-zoom-number" style="display:none">16.6</div>        <div class="tmap-zoom-spliter" style="display:block"></div>        <div class="tmap-zoom-out"><img class="tmap-zoom-out-image" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA4SURBVHgB7cixEQAQEEXBTwsaoAb9l6AGGlADQjMCM5dc8jZcCQC+wjOp9rNZFktDs5W7ogDA3wZy7gUEOT7xUAAAAABJRU5ErkJggg=="></div>    </div></div></div></div></div></div></div>
+        <div id="radar-fallback" class="radar-fallback" hidden="">
+          <div class="radar-head">
+            <strong>距离雷达图</strong>
+            <span>地图服务未就绪，已切换为本地示意视图</span>
+          </div>
+          <svg id="radar-svg" viewBox="0 0 620 460" preserveAspectRatio="xMidYMid meet"><circle cx="310" cy="240" r="41.25" fill="none" stroke="#e6e0d6" stroke-dasharray="4 5"></circle><text x="315" y="211.75" font-size="10" fill="#9a9186">103m</text><circle cx="310" cy="240" r="82.5" fill="none" stroke="#e6e0d6" stroke-dasharray="4 5"></circle><text x="315" y="170.5" font-size="10" fill="#9a9186">206m</text><circle cx="310" cy="240" r="123.75" fill="none" stroke="#e6e0d6" stroke-dasharray="4 5"></circle><text x="315" y="129.25" font-size="10" fill="#9a9186">309m</text><circle cx="310" cy="240" r="165" fill="none" stroke="#e6e0d6" stroke-dasharray="4 5"></circle><text x="315" y="88" font-size="10" fill="#9a9186">412m</text><circle cx="310" cy="240" r="8" fill="#1c5fa8" stroke="#fff" stroke-width="3"></circle><text x="310" y="264" text-anchor="middle" font-size="11" fill="#1c5fa8" font-weight="700">我的位置</text><line x1="310" y1="240" x2="310" y2="160.2135922330097" stroke="#f0a400" stroke-width="2.4" stroke-dasharray="6 5" opacity="0.95"></line><circle cx="310" cy="160.2135922330097" r="12" fill="#f0a400" stroke="#fff" stroke-width="2.5" style="cursor:pointer" data-store="1450713"></circle><text x="326" y="164.2135922330097" font-size="10.5" fill="#a97a00" font-weight="700">推荐</text><text x="310" y="184.2135922330097" text-anchor="middle" font-size="10.5" fill="#5f594f">黄浦华旭国际大厦</text><text x="310" y="196.2135922330097" text-anchor="middle" font-size="10" fill="#da291c" font-weight="700">144m</text><line x1="310" y1="240" x2="413.39969547186604" y2="206.40340235670627" stroke="#da291c" stroke-width="1.4" stroke-dasharray="6 5" opacity="0.5"></line><circle cx="413.39969547186604" cy="206.40340235670627" r="9" fill="#da291c" stroke="#fff" stroke-width="2.5" style="cursor:pointer" data-store="1450441"></circle><text x="413.39969547186604" y="230.40340235670627" text-anchor="middle" font-size="10.5" fill="#5f594f">福州路</text><text x="413.39969547186604" y="242.40340235670627" text-anchor="middle" font-size="10" fill="#da291c" font-weight="700">235m</text><line x1="310" y1="240" x2="396.3316722620739" y2="358.8253528655612" stroke="#da291c" stroke-width="1.4" stroke-dasharray="6 5" opacity="0.5"></line><circle cx="396.3316722620739" cy="358.8253528655612" r="9" fill="#da291c" stroke="#fff" stroke-width="2.5" style="cursor:pointer" data-store="1450056"></circle><text x="396.3316722620739" y="382.8253528655612" text-anchor="middle" font-size="10.5" fill="#5f594f">食品一店</text><text x="396.3316722620739" y="394.8253528655612" text-anchor="middle" font-size="10" fill="#da291c" font-weight="700">355m</text><line x1="310" y1="240" x2="218.62221988025993" y2="365.77072448960047" stroke="#da291c" stroke-width="1.4" stroke-dasharray="6 5" opacity="0.5"></line><circle cx="218.62221988025993" cy="365.77072448960047" r="9" fill="#da291c" stroke="#fff" stroke-width="2.5" style="cursor:pointer" data-store="1450195"></circle><text x="218.62221988025993" y="389.77072448960047" text-anchor="middle" font-size="10.5" fill="#5f594f">雅居乐</text><text x="218.62221988025993" y="401.77072448960047" text-anchor="middle" font-size="10" fill="#da291c" font-weight="700">382m</text><line x1="310" y1="240" x2="153.07567481129968" y2="189.01219592813362" stroke="#da291c" stroke-width="1.4" stroke-dasharray="6 5" opacity="0.5"></line><circle cx="153.07567481129968" cy="189.01219592813362" r="9" fill="#da291c" stroke="#fff" stroke-width="2.5" style="cursor:pointer" data-store="1450124"></circle><text x="153.07567481129968" y="213.01219592813362" text-anchor="middle" font-size="10.5" fill="#5f594f">南京西路NX258</text><text x="153.07567481129968" y="225.01219592813362" text-anchor="middle" font-size="10" fill="#da291c" font-weight="700">412m</text></svg>
+        </div>
+        <div class="map-overlay" id="map-legend">
+          <div class="legend-row"><i class="dot dot-me"></i> 我的位置</div>
+          <div class="legend-row"><i class="dot dot-store"></i> 麦当劳门店</div>
+          <div class="legend-row"><i class="dot dot-best"></i> 推荐门店</div>
+        </div>
+        <div class="map-banner is-warn" id="map-banner">门店实际坐标未能获取（麦当劳 MCP 不返回经纬度），当前为按距离等比的示意排布；导航请以门店地址为准。</div>
+      </section>
+
+      <aside class="panel panel-right">
+        <div class="panel-head">
+          <h2 id="right-title">门店详情</h2>
+        </div>
+        <div class="panel-body" id="right-body"><div class="detail-title"><h3>麦当劳上海黄浦华旭国际大厦餐厅</h3><button class="btn btn-primary btn-sm" data-order="1450713">去点餐</button></div><div class="detail-addr">南京东路街道西藏中路336号</div><dl class="kv"><dt>门店编号</dt><dd>1450713</dd><dt>取餐方式</dt><dd>到店自取</dd><dt>营业时间</dt><dd>00:00 - 23:59</dd><dt>距离</dt><dd>144m</dd><dt>预计到达</dt><dd>2 分钟（步行）</dd><dt>繁忙度预估</dt><dd>空闲 · 等待约 3 分钟</dd><dt>是否支持预约</dt><dd>支持</dd></dl><div class="notice notice-info"><span class="notice-icon">📐</span><span>带 * 的为模型预估（按时段客流 + 门店因子推演），非实时排队数据；下单前请以门店实际为准。</span></div><div class="section-title">门店在售 · 折扣力度 Top</div><div class="prod-row is-clickable" data-meal="9900004236" data-meal-name="人气超值四件套随心选"><img class="prod-thumb" src="https://menu-img.mcd.cn/pcm/prod/menu/20260824/product/MS_9900004236_320.gif" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="prod-info"><div class="prod-name">人气超值四件套随心选</div><div class="prod-sub">9900004236 · 随单购麦金卡优惠</div></div><div class="prod-price"><b>¥29</b><s>¥58</s></div></div><div class="prod-row is-clickable" data-meal="9900000890" data-meal-name="板烧鸡腿堡四件套"><img class="prod-thumb" src="https://menu-img.mcd.cn/pcm/prod/menu/20260824/product/MS_9900000890_320.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="prod-info"><div class="prod-name">板烧鸡腿堡四件套</div><div class="prod-sub">9900000890 · 随单购麦金卡优惠</div></div><div class="prod-price"><b>¥28</b><s>¥57</s></div></div><div class="prod-row is-clickable" data-meal="9900004066" data-meal-name="堡堡随心拼（7件任选）"><img class="prod-thumb" src="https://menu-img.mcd.cn/pcm/prod/menu/20260624/product/MS_9900004066_320.gif" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="prod-info"><div class="prod-name">堡堡随心拼（7件任选）</div><div class="prod-sub">9900004066 · 1715 千卡</div></div><div class="prod-price"><b>¥72.50</b><s>¥101.50</s></div></div><div class="prod-row is-clickable" data-meal="9900016309" data-meal-name="龙焰鸡腿堡四件套"><img class="prod-thumb" src="https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900016309_320.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="prod-info"><div class="prod-name">龙焰鸡腿堡四件套</div><div class="prod-sub">9900016309 · 随单购麦金卡优惠</div></div><div class="prod-price"><b>¥29</b><s>¥57</s></div></div><div class="prod-row is-clickable" data-meal="9900000888" data-meal-name="巨无霸四件套"><img class="prod-thumb" src="https://menu-img.mcd.cn/pcm/prod/menu/20260824/product/MS_9900000888_320.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="prod-info"><div class="prod-name">巨无霸四件套</div><div class="prod-sub">9900000888 · 随单购麦金卡优惠</div></div><div class="prod-price"><b>¥32</b><s>¥58.50</s></div></div><div class="prod-row is-clickable" data-meal="9900016310" data-meal-name="龙焰芝士棒鸡腿堡四件套"><img class="prod-thumb" src="https://menu-img.mcd.cn/pcm/prod/menu/ProductPool/product/MS_9900016310_320.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="prod-info"><div class="prod-name">龙焰芝士棒鸡腿堡四件套</div><div class="prod-sub">9900016310 · 随单购麦金卡优惠</div></div><div class="prod-price"><b>¥32</b><s>¥57</s></div></div></div>
+      </aside>
+    </div>
+
+    <footer class="calendar-bar">
+      <div class="calendar-head">
+        <h2>未来 7 天活动日历</h2>
+        <span id="calendar-hint">点击某天查看当日全部活动，再点活动可进入详情页</span>
+      </div>
+      <div class="calendar-days" id="calendar-days"><div class="cal-day is-today is-empty" data-day="2026-10-10"><div class="cal-date">10/10<em>今天</em></div><div class="cal-count">无活动</div><div class="cal-titles"></div></div><div class="cal-day is-empty" data-day="2026-10-11"><div class="cal-date">10/11<em>明天</em></div><div class="cal-count">无活动</div><div class="cal-titles"></div></div><div class="cal-day is-empty" data-day="2026-10-12"><div class="cal-date">10/12<em>周一</em></div><div class="cal-count">无活动</div><div class="cal-titles"></div></div><div class="cal-day is-empty" data-day="2026-10-13"><div class="cal-date">10/13<em>周二</em></div><div class="cal-count">无活动</div><div class="cal-titles"></div></div><div class="cal-day is-empty" data-day="2026-10-14"><div class="cal-date">10/14<em>周三</em></div><div class="cal-count">无活动</div><div class="cal-titles"></div></div><div class="cal-day is-empty" data-day="2026-10-15"><div class="cal-date">10/15<em>周四</em></div><div class="cal-count">无活动</div><div class="cal-titles"></div></div><div class="cal-day is-empty" data-day="2026-10-16"><div class="cal-date">10/16<em>周五</em></div><div class="cal-count">无活动</div><div class="cal-titles"></div></div></div>
+      <div class="calendar-detail" id="calendar-detail" hidden=""></div>
+    </footer>
+  </div>
+
+  <!-- ====================== 点餐页 ====================== -->
+  <div data-page-view="order" id="page-order" hidden="">
+    <div id="order-root"></div>
+  </div>
+
+  <!-- ====================== 结算页 ====================== -->
+  <div data-page-view="checkout" id="page-checkout" hidden="">
+    <div id="checkout-root"></div>
+  </div>
+
+  <!-- ====================== 下单成功页 ====================== -->
+  <div data-page-view="result" id="page-result" hidden="">
+    <div id="result-root"></div>
+  </div>
+
+  <!-- ====================== 活动详情页 ====================== -->
+  <div data-page-view="activity" id="page-activity" hidden="">
+    <div id="activity-root"></div>
+  </div>
+
+</main>
+
+<!-- ====================== 全局浮层 ====================== -->
+<div id="modal-host" hidden=""></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<button class="fab" id="fab-order" title="一键点餐 · 麦当劳上海黄浦华旭国际大厦餐厅（可在雷达页左侧点门店卡片切换）">
+  <span class="fab-icon">🍔</span>
+  <span class="fab-text">一键点餐<em id="fab-store">上海黄浦华旭国际大厦</em></span>
+</button>
+
+<script src="core.js"></script>
+<script src="api.js"></script>
+<script src="auth.js"></script><div id="login-mask" class="login-mask"><div class="login-card" role="dialog" aria-modal="true" aria-labelledby="lg-title"><div class="lg-brand"><span class="lg-logo">🍔</span><div class="lg-brand-text"><b id="lg-title">登录麦麦雷达地图</b><span>登录后可在顶栏快速查看券、积分与历史订单</span></div></div><div class="lg-tabs" role="tablist"><button type="button" class="lg-tab is-on" data-lg-tab="phone" role="tab" aria-selected="true"><b>手机号登录</b><span>短信验证码</span></button><button type="button" class="lg-tab" data-lg-tab="wechat" role="tab" aria-selected="false"><b>微信快捷登录</b><span>扫码授权</span></button></div><div class="lg-body" id="lg-body"><div class="lg-form"><label class="lg-field"><span class="lg-label">手机号</span><div class="lg-input"><em>+86</em><input id="lg-phone" type="tel" inputmode="numeric" maxlength="11" autocomplete="tel" placeholder="请输入 11 位手机号"></div></label><label class="lg-field"><span class="lg-label">验证码</span><div class="lg-input is-code"><input id="lg-code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位数字"><button type="button" class="lg-send" id="lg-send">获取验证码</button></div></label><button type="button" class="btn btn-primary lg-submit" id="lg-submit">登录</button><p class="lg-msg" id="lg-msg" hidden=""></p><p class="lg-hint">演示环境不会真的发短信：点「获取验证码」后，<b>任意 6 位数字</b>都能通过。手机号只用于本地展示，不会上传。</p></div></div><div class="lg-foot"><button type="button" class="lg-skip" id="lg-skip">暂不登录，先逛逛</button><span class="lg-note">本地演示登录 · 不上传任何信息 · 未接入麦当劳真实账号体系</span></div></div></div>
+<script src="map.js"></script>
+<script src="view-radar.js"></script>
+<script src="view-order.js"></script>
+<script src="app.js"></script>
+
+
+</body></html>

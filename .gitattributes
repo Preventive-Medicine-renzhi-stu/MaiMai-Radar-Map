@@ -1,0 +1,12 @@
+# 目标：版本库与工作副本都保持 LF，不让 Git 按平台偷偷改写换行符。
+# （本机 core.autocrlf=true，若不显式指定 eol=lf，checkout 会把文件全改成 CRLF）
+* text=auto eol=lf
+
+# macOS / Linux 启动脚本必须 LF，否则终端里报 "\r: command not found"
+*.sh text eol=lf
+*.command text eol=lf
+
+# 二进制资源不做文本转换
+*.png binary
+*.jpg binary
+*.ico binary

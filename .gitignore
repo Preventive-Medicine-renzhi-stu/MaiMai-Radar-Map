@@ -1,0 +1,59 @@
+# 密钥与本地配置（严禁提交真实 Token）
+.env
+.env.*
+!.env.example
+mcp-config.json
+*.token
+*token*.local
+
+# 本地地图 Key（由 .env 的 TMAP_KEY 生成，严禁提交）
+web/tmap-key.local.js
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 运行期数据
+data/
+logs/
+*.log
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 前端测试依赖
+node_modules/
+package-lock.json
+
+# 助手的工作记忆（踩坑录）。不入版本库，原因有二：
+#   ① 它每天自动追加，进来会把 git status 刷成永不清净；
+#   ② 实测血案：笔记里明文抄了腾讯 TMAP_KEY，一提交就直接进历史，只能靠重写提交才擦掉。
+#      调试过程中的密钥、账号、订单号极易混进去，这类文件一律不入库。
+.workbuddy/
+
+# 临时调试产物（保留文件本身，但不进版本库）
+# 注意：不要删掉 .tmp/ 这条 —— 实测教训：一旦漏了它，git add -A 会把无头浏览器
+# 落在里面的用户配置目录（书签、扩展、浏览数据）整个卷进版本库。
+.tmp/
+.tmp_geo/
+_dom.tmp.html
+web/__*.html
+_shot*.png
+web/_shot*.png
+
+# 注意：web/data.js 与 web/data.json 是**有意提交**的。
+# 它们是真实 MCP 快照的导出结果，用于让评审无需 Token 即可打开页面查看完整效果。
+#
+# ⚠️ 安全提醒（2026-10-10）：真实快照内含**真实会员号 account_id 与真实订单号 order_id**。
+# 因此本仓库**禁止推送到任何公开平台**（GitHub / GitLab 等公开仓库）。
+# 若日后需要开源，先执行下面两条命令换成脱敏样例再提交：
+#     python -m src.main web --demo
+#     git rm --cached web/data.js web/data.json && echo "web/data.js" >> .gitignore
