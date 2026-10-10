@@ -1,3 +1,58 @@
 文件大小限制：将data3.1/data3.2解压的文件放入data3：.venv\Lib\site-packages
 整合所有data数据到一个文件夹中
 其他数据为重复数据可以不用管
+目录结构：
+  .
+├── README.md                   项目说明（本文件）
+├── CONTEST_DECLARATION.md      参赛声明（官方原文，不可修改）
+├── MCP_INTEGRATION.md          麦当劳 MCP 集成说明
+├── mcp-config.example.json     脱敏后的 MCP 配置示例（仅环境变量占位符）
+├── workbuddy.md                WorkBuddy 开发对话上下文
+├── requirements.txt            依赖
+├── start.bat                   🚀 一键启动（Windows：双击即可）
+├── 启动麦当劳雷达地图.bat        同上，中文文件名的快捷入口
+├── start.command               🚀 一键启动（macOS：双击即可）
+├── start.sh                    🚀 一键启动（Linux / 任意终端）
+├── web/                        前端（纯静态，无构建步骤，hash 路由多页面）
+│   ├── index.html              页面壳：顶栏 + 5 个 [data-page-view] 容器 + 浮层
+│   ├── styles.css              样式（麦当劳品牌色 #da291c / #ffc72c）
+│   ├── core.js                 工具 / 状态 / 数据访问 / 结算引擎 / 前端路由
+│   ├── api.js                  本地服务适配层（探测 / 切城市 / 写 Token）
+│   ├── auth.js                 首屏登录弹窗（手机号 / 微信，本地演示）
+│   ├── map.js                  腾讯地图 GL JS 封装 + 纯 SVG 降级雷达图
+│   ├── view-radar.js           雷达首页：三模式 + 7 天日历 + 城市下拉
+│   ├── view-order.js           点餐页 / 确认订单 / 下单成功 / 活动详情
+│   ├── app.js                  路由注册 + 启动 + 顶栏用户信息下拉
+│   ├── data.js                 数据包（由 `main web` 生成，含 window.MCD_DATA）
+│   ├── data.json               同上的标准 JSON
+│   └── tmap-key.local.js       本机地图 Key（由 `main web` 生成，已 gitignore，不入库）
+├── src/
+│   ├── config.py               配置与 Token 加载
+│   ├── mcp_client.py           MCP streamable-HTTP 客户端
+│   ├── catalog.py              门店 / 菜单 / 订单 / 账户 / 门店券 / 营养 / 套餐组成解析
+│   ├── cities.py               城市 → 地标关键词（全项目唯一一份）
+│   ├── descriptions.py         餐品简介（MCP 不提供，本项目三层兜底生成）
+│   ├── pricing.py              券面值与匹配词解析
+│   ├── geo.py                  距离-耗时 / 繁忙度 / 雷达布局 / 日历
+│   ├── store_radar.py          三模式核心逻辑
+│   ├── webexport.py            导出前端数据包
+│   ├── serve.py                本地一键服务：静态托管 + /api/status|city|token|suggest
+│   ├── demo_data.py            真实 MCP 快照（离线演示数据集）
+│   ├── demo_client.py          离线演示客户端
+│   ├── parsers.py              活动 / 券文本解析
+│   ├── radar.py                活动关注度打分
+│   ├── render.py               终端 / JSON 渲染
+│   └── main.py                 命令行入口
+└── tests/
+    ├── test_radar.py           活动雷达（23 项）
+    ├── test_store_radar.py     门店 / 三模式 / 数据包契约（36 项）
+    ├── test_descriptions.py    餐品简介三层兜底（15 项）
+    ├── test_nutrition.py       营养三档匹配 + 套餐组成累加（20 项）
+    ├── test_serve.py           本地服务 API / 切城市 / 写 Token / 定位候选 / 实例复用（56 项）
+    ├── web_smoke.js            前端 DOM 冒烟测试：五页面全链路（317 项断言）
+    ├── make_fixture.py         生成冒烟测试用的数据包夹具（与真实 data.js 解耦）
+    ├── fixtures/
+    │   └── demo-data.js        夹具本体（由 --demo 快照生成，勿手工编辑）
+    ├── css_coverage.js         CSS 类名与变量覆盖体检 + 层叠上下文防线
+    ├── browser_hit_check.sh    真实浏览器命中测试（弹窗能否点动 + 地图落点 + 门店真实坐标/驾车路线 + 活动解析 + 定位候选，34 项）
+    └── test_tmap_loader.js     地图 Key / 代理双模式选择（18 项）
